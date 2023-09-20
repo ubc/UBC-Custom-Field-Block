@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 2,
+  "name": "ubc/custom-field-block",
+  "version": "1.0.0",
+  "title": "Custom Field",
+  "category": "theme",
+  "icon": "category",
+  "description": "",
+  "supports": {
+    "html": false
+  },
+  "textdomain": "ubc-custom-field-block",
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "attributes": {
+    "customFieldName": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "usesContext": [
+    "postId",
+    "postType"
+  ]
+}
