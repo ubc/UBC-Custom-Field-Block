@@ -8,7 +8,8 @@
 	"icon": "category",
 	"description": "",
 	"supports": {
-		"html": false
+		"html": false,
+		"interactivity": true
 	},
 	"textdomain": "ubc-custom-field-block",
 	"editorScript": "file:./index.js",
