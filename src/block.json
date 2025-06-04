@@ -19,6 +19,14 @@
 		"customFieldName": {
 			"type": "string",
 			"default": ""
+		},
+		"renderMethod": {
+			"type": "string",
+			"default": "separateByComma"
+		},
+		"customSeparator": {
+			"type": "string",
+			"default": " - "
 		}
 	},
 	"usesContext": [ "postId", "postType" ]

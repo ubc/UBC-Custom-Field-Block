@@ -48,6 +48,56 @@ function localize_to_editor_script() {
 }
 
 /**
+ * Generate the custom field value based on the render method.
+ *
+ * @param string $meta_key the meta key.
+ * @param int    $post_id the post id.
+ * @param string $render_method the render method.
+ * @param string $class_names the class names.
+ * @return string the custom field value.
+ */
+function generate_custom_field_value( $meta_key, $post_id, $render_method, $class_names, $custom_separator ) {
+	$meta_key        = sanitize_text_field( $meta_key );
+	$metadata_string = '';
+
+	if ( '' === trim( $meta_key ) ) {
+		return $metadata_string;
+	}
+
+	$metadata = get_metadata( 'post', $post_id, $meta_key );
+
+	if ( false === $metadata || ! is_array( $metadata ) ) {
+		return $metadata_string;
+	}
+
+	switch ( $render_method ) {
+		case 'separateByComma':
+			$metadata_string = implode( '<span class="wp-block-custom-field-separator">,</span> ', $metadata );
+			break;
+		case 'separateByNewLine':
+			$metadata_string = implode( '<br>', $metadata );
+			break;
+		case 'separateBySpace':
+			$metadata_string = implode( ' ', $metadata );
+			break;
+		case 'unorderedList':
+			$metadata_string = '<ul><li>' . implode( '</li><li>', $metadata ) . '</li></ul>';
+			break;
+		case 'orderedList':
+			$metadata_string = '<ol><li>' . implode( '</li><li>', $metadata ) . '</li></ol>';
+			break;
+		case 'customSeparator':
+			$metadata_string = implode( $custom_separator, $metadata );
+			break;
+		default:
+			$metadata_string = implode( '<span class="wp-block-custom-field-separator">,</span> ', $metadata );
+			break;
+	}
+
+	return sprintf( "<div class='wp-block-custom-field %s'>%s</div>", esc_attr( $class_names ), wp_kses_post( $metadata_string ) );
+}
+
+/**
  * ServerSideRendering callback to render the content of the block.
  *
  * @param array  $attributes block attributes.
@@ -60,21 +110,13 @@ function render_custom_field( $attributes, $content, $block ) {
 		return;
 	}
 
-	$post_id     = intval( $block->context['postId'] );
-	$meta_key    = sanitize_text_field( $attributes['customFieldName'] );
-	$class_names = isset( $attributes['className'] ) ? esc_attr( $attributes['className'] ) : '';
+	$post_id          = intval( $block->context['postId'] );
+	$meta_key         = sanitize_text_field( $attributes['customFieldName'] );
+	$class_names      = isset( $attributes['className'] ) ? esc_attr( $attributes['className'] ) : '';
+	$render_method    = isset( $attributes['renderMethod'] ) ? sanitize_text_field( $attributes['renderMethod'] ) : 'separateByComma';
+	$custom_separator = isset( $attributes['customSeparator'] ) ? wp_kses_post( wp_unslash( $attributes['customSeparator'] ) ) : ' - ';
 
-	$metadata = get_metadata( 'post', $post_id, $meta_key, true );
-
-	if ( false === $metadata ) {
-		return;
-	}
-
-	if ( '' === trim( $meta_key ) ) {
-		return;
-	}
-
-	return sprintf( "<div class='wp-block-custom-field %s'>%s</div>", $class_names, $metadata );
+	return generate_custom_field_value( $meta_key, $post_id, $render_method, $class_names, $custom_separator );
 }//end render_custom_field()
 
 add_action( 'wp_ajax_query_block_custom_field', __NAMESPACE__ . '\\get_query_block_custom_field' );
@@ -88,24 +130,19 @@ function get_query_block_custom_field() {
 
 	wp_verify_nonce( $_POST['nonce'], 'custom_field_block_ajax' );
 
-	if ( ! isset( $_POST['post_id'] ) || ! isset( $_POST['meta_key'] ) ) {
+	if ( ! isset( $_POST['post_id'] ) || ! isset( $_POST['meta_key'] ) || ! isset( $_POST['render_method'] ) || ! isset( $_POST['class_names'] ) || ! isset( $_POST['custom_separator'] ) ) {
 		wp_send_json_error( 'Missing required informations for the request.' );
 	}
 
-	$post_id  = intval( $_POST['post_id'] );
-	$meta_key = sanitize_text_field( wp_unslash( $_POST['meta_key'] ) );
+	$post_id          = intval( $_POST['post_id'] );
+	$meta_key         = sanitize_text_field( wp_unslash( $_POST['meta_key'] ) );
+	$render_method    = sanitize_text_field( wp_unslash( $_POST['render_method'] ) );
+	$class_names      = sanitize_text_field( wp_unslash( $_POST['class_names'] ) );
+	$custom_separator = wp_kses_post( wp_unslash( $_POST['custom_separator'] ) );
 
-	$metadata = get_metadata( 'post', $post_id, $meta_key, true );
+	$response = generate_custom_field_value( $meta_key, $post_id, $render_method, $class_names, $custom_separator );
 
-	if ( false === $metadata ) {
-		wp_send_json_error();
-	}
-
-	if ( '' === trim( $meta_key ) ) {
-		wp_send_json_error();
-	}
-
-	wp_send_json_success( $metadata );
+	wp_send_json_success( $response );
 }
 
 add_action( 'wp_ajax_custom_field_block_get_meta_keys', __NAMESPACE__ . '\\get_meta_keys' );

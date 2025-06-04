@@ -11,7 +11,7 @@ import { __ } from '@wordpress/i18n';
  *
  * @see https://developer.wordpress.org/block-editor/reference-guides/packages/packages-block-editor/#useblockprops
  */
-import { InspectorControls } from '@wordpress/block-editor';
+import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
 
 /**
  * Lets webpack process CSS, SASS or SCSS files referenced in JavaScript files.
@@ -21,9 +21,36 @@ import { InspectorControls } from '@wordpress/block-editor';
  */
 import './editor.scss';
 
-import { PanelBody, SelectControl } from '@wordpress/components';
+import { PanelBody, SelectControl, TextControl } from '@wordpress/components';
 import { useEffect, useState } from '@wordpress/element';
 import { Fragment } from 'react';
+
+const renderMethods = [
+	{
+		label: 'Separate by comma',
+		value: 'separateByComma'
+	},
+	{
+		label: 'Separate by new line',
+		value: 'separateByNewLine'
+	},
+	{
+		label: 'Separate by space',
+		value: 'separateBySpace'
+	},
+	{
+		label: 'Unordered list',
+		value: 'unorderedList'
+	},
+	{
+		label: 'Ordered list',
+		value: 'orderedList'
+	},
+	{
+		label: 'Custom Separator',
+		value: 'customSeparator'
+	}
+];
 
 /**
  * The edit function describes the structure of your block in the context of the
@@ -33,32 +60,34 @@ import { Fragment } from 'react';
  *
  * @return {WPElement} Element to render.
  */
-export default function Edit( props ) {
+export default function Edit(props) {
 	const { attributes, setAttributes, context } = props;
-	const { customFieldName, className } = attributes;
+	const { customFieldName, className, renderMethod, customSeparator } = attributes;
 	const { postId } = context;
-	const [ customFieldValue, setCustomFieldValue ] = useState('');
-	const [ metaKeys, setMetaKeys ] = useState([]);
+	const [customFieldHTML, setCustomFieldHTML] = useState('');
+	const [metaKeys, setMetaKeys] = useState([]);
+
+	const blockProps = useBlockProps();
 
 	useEffect(() => {
-		const metaKeys = async() => {
+		const metaKeys = async () => {
 
 			const data = new FormData();
 
-			data.append( 'action', 'custom_field_block_get_meta_keys' );
-			data.append( 'nonce', ubc_custom_field_block.nonce );
+			data.append('action', 'custom_field_block_get_meta_keys');
+			data.append('nonce', ubc_custom_field_block.nonce);
 
-			const response = await fetch( ajaxurl, {
-			  method: "POST",
-			  credentials: 'same-origin',
-			  body: data
-			} );
+			const response = await fetch(ajaxurl, {
+				method: "POST",
+				credentials: 'same-origin',
+				body: data
+			});
 			const responseJson = await response.json();
-			
-			if( responseJson.success ) {
-				setMetaKeys( responseJson.data );
 
-				if( '' === customFieldName && responseJson.data.length > 0 ) {
+			if (responseJson.success) {
+				setMetaKeys(responseJson.data);
+
+				if ('' === customFieldName && responseJson.data.length > 0) {
 					setAttributes({
 						customFieldName: responseJson.data[0]
 					});
@@ -70,57 +99,82 @@ export default function Edit( props ) {
 	}, []);
 
 	useEffect(() => {
-		const getCustomFieldValue = async() => {
+		const getCustomFieldHTML = async () => {
 
 			const data = new FormData();
 
-			data.append( 'action', 'query_block_custom_field' );
-			data.append( 'meta_key', customFieldName );
-			data.append( 'post_id', postId );
-			data.append( 'nonce', ubc_custom_field_block.nonce );
-		
-			const response = await fetch( ajaxurl, {
-			  method: "POST",
-			  credentials: 'same-origin',
-			  body: data
-			} );
+			data.append('action', 'query_block_custom_field');
+			data.append('meta_key', customFieldName);
+			data.append('post_id', postId);
+			data.append('render_method', renderMethod);
+			data.append('class_names', className);
+			data.append('custom_separator', customSeparator);
+			data.append('nonce', ubc_custom_field_block.nonce);
+
+			const response = await fetch(ajaxurl, {
+				method: "POST",
+				credentials: 'same-origin',
+				body: data
+			});
 			const responseJson = await response.json();
-			
-			if( false === responseJson.success ) {
-				setCustomFieldValue( '' );
+
+			if (false === responseJson.success) {
+				setCustomFieldHTML('');
 			}
-			setCustomFieldValue( responseJson.data );
+			setCustomFieldHTML(responseJson.data);
 		};
 
-		getCustomFieldValue();
-	}, [ customFieldName ]);
+		getCustomFieldHTML();
+	}, [customFieldName, renderMethod, className, postId, customSeparator]);
 
 	return (
 		<Fragment>
 			<div
-				dangerouslySetInnerHTML={ { __html: customFieldValue } }
+				dangerouslySetInnerHTML={{ __html: customFieldHTML }}
 				className={`wp-block-custom-field ${className}`}
+				{...blockProps}
 			/>
 			<InspectorControls>
-				<PanelBody title="Settings" className='ubc-subcategory-panel-settings' initialOpen={ true }>
-					{ metaKeys.length > 0 ? (
-						<SelectControl
-							label="Custom Field Name"
-							value={ customFieldName }
-							options={ metaKeys.map(key => {
-								return {
-									label: key,
-									value: key
-								};
-							}) }
-							onChange={ ( newCustomFieldName ) => {
-								setAttributes({
-									customFieldName: newCustomFieldName
-								});
-							} }
-							__nextHasNoMarginBottom
-						/>
-					) : 'dw'
+				<PanelBody title="Settings" className='ubc-subcategory-panel-settings' initialOpen={true}>
+					{metaKeys.length > 0 ? (
+						<>
+							<SelectControl
+								label="Custom Field Name"
+								value={customFieldName}
+								options={metaKeys.map(key => {
+									return {
+										label: key,
+										value: key
+									};
+								})}
+								onChange={(newCustomFieldName) => {
+									setAttributes({
+										customFieldName: newCustomFieldName
+									});
+								}}
+								__nextHasNoMarginBottom
+							/>
+							<SelectControl
+								label="Render Method"
+								value={renderMethod}
+								options={renderMethods}
+								onChange={(newRenderMethod) => {
+									setAttributes({ renderMethod: newRenderMethod });
+								}}
+								__nextHasNoMarginBottom
+							/>
+							{ 'customSeparator' === renderMethod && (
+								<TextControl
+									label="Custom Separator"
+									value={customSeparator}
+									onChange={(newCustomSeparator) => {
+										setAttributes({ customSeparator: newCustomSeparator });
+									}}
+									__nextHasNoMarginBottom
+								/>
+							)}
+						</>
+					) : ''
 					}
 				</PanelBody>
 			</InspectorControls>
