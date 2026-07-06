@@ -53,21 +53,21 @@ function localize_to_editor_script() {
  * @param string $meta_key the meta key.
  * @param int    $post_id the post id.
  * @param string $render_method the render method.
- * @param string $class_names the class names.
- * @return string the custom field value.
+ * @param string $custom_separator the custom separator.
+ * @return string|false the inner custom field markup, or false when there is nothing to render.
  */
-function generate_custom_field_value( $meta_key, $post_id, $render_method, $class_names, $custom_separator ) {
+function generate_custom_field_value( $meta_key, $post_id, $render_method, $custom_separator ) {
 	$meta_key        = sanitize_text_field( $meta_key );
 	$metadata_string = '';
 
 	if ( '' === trim( $meta_key ) ) {
-		return $metadata_string;
+		return false;
 	}
 
 	$metadata = get_metadata( 'post', $post_id, $meta_key );
 
 	if ( false === $metadata || ! is_array( $metadata ) ) {
-		return $metadata_string;
+		return false;
 	}
 
 	switch ( $render_method ) {
@@ -94,7 +94,7 @@ function generate_custom_field_value( $meta_key, $post_id, $render_method, $clas
 			break;
 	}
 
-	return sprintf( "<div class='wp-block-custom-field %s'>%s</div>", esc_attr( $class_names ), wp_kses_post( $metadata_string ) );
+	return $metadata_string;
 }
 
 /**
@@ -112,11 +112,22 @@ function render_custom_field( $attributes, $content, $block ) {
 
 	$post_id          = intval( $block->context['postId'] );
 	$meta_key         = sanitize_text_field( $attributes['customFieldName'] );
-	$class_names      = isset( $attributes['className'] ) ? esc_attr( $attributes['className'] ) : '';
 	$render_method    = isset( $attributes['renderMethod'] ) ? sanitize_text_field( $attributes['renderMethod'] ) : 'separateByComma';
 	$custom_separator = isset( $attributes['customSeparator'] ) ? wp_kses_post( wp_unslash( $attributes['customSeparator'] ) ) : ' - ';
 
-	return generate_custom_field_value( $meta_key, $post_id, $render_method, $class_names, $custom_separator );
+	$inner_html = generate_custom_field_value( $meta_key, $post_id, $render_method, $custom_separator );
+
+	if ( false === $inner_html ) {
+		return '';
+	}
+
+	// Pull in the class names and inline styles WordPress generates from the
+	// block's `supports` (color, typography, spacing, border, etc.) so users
+	// can style the block through the core editor controls. The legacy
+	// `wp-block-custom-field` class is retained for backwards compatibility.
+	$wrapper_attributes = get_block_wrapper_attributes( array( 'class' => 'wp-block-custom-field' ) );
+
+	return sprintf( '<div %s>%s</div>', $wrapper_attributes, wp_kses_post( $inner_html ) );
 }//end render_custom_field()
 
 add_action( 'wp_ajax_query_block_custom_field', __NAMESPACE__ . '\\get_query_block_custom_field' );
@@ -140,7 +151,13 @@ function get_query_block_custom_field() {
 	$class_names      = sanitize_text_field( wp_unslash( $_POST['class_names'] ) );
 	$custom_separator = wp_kses_post( wp_unslash( $_POST['custom_separator'] ) );
 
-	$response = generate_custom_field_value( $meta_key, $post_id, $render_method, $class_names, $custom_separator );
+	$inner_html = generate_custom_field_value( $meta_key, $post_id, $render_method, $custom_separator );
+
+	// The editor injects this response into its own block-props wrapper element
+	// (which carries the `wp-block-custom-field` class, any additional class
+	// names, and the support-generated styles), so we only return the inner
+	// markup here to keep the editor DOM identical to the front end.
+	$response = false === $inner_html ? '' : wp_kses_post( $inner_html );
 
 	wp_send_json_success( $response );
 }

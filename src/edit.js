@@ -67,7 +67,7 @@ export default function Edit(props) {
 	const [customFieldHTML, setCustomFieldHTML] = useState('');
 	const [metaKeys, setMetaKeys] = useState([]);
 
-	const blockProps = useBlockProps();
+	const blockProps = useBlockProps( { className: 'wp-block-custom-field' } );
 
 	useEffect(() => {
 		const metaKeys = async () => {
@@ -130,9 +130,8 @@ export default function Edit(props) {
 	return (
 		<Fragment>
 			<div
-				dangerouslySetInnerHTML={{ __html: customFieldHTML }}
-				className={`wp-block-custom-field ${className}`}
 				{...blockProps}
+				dangerouslySetInnerHTML={{ __html: customFieldHTML }}
 			/>
 			<InspectorControls>
 				<PanelBody title="Settings" className='ubc-subcategory-panel-settings' initialOpen={true}>
